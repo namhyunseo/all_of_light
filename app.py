@@ -8,112 +8,131 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Page configuration
-st.set_page_config(page_title="Light RAG Chatbot", layout="wide")
+st.set_page_config(page_title="Light RAG Chatbot", page_icon="💡", layout="wide")
 
-st.title("LOGOS 조명팀 chatbot")
+# Custom CSS Loading
+def local_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# Load CSS if it exists
+css_file = "style.css"
+if os.path.exists(css_file):
+    local_css(css_file)
+
+st.title("💡 LOGOS 조명팀 Chatbot")
+st.markdown("---")
 
 # Sidebar for configuration
 with st.sidebar:
-    st.header("설정")
+    st.header("⚙️ 설정")
     
     # API Key Input
-    # Priority: 1. User Input, 2. OS Env (including .env), 3. Streamlit Secrets
-    api_key = st.text_input("Google API Key 입력", type="password", help="Google AI Studio에서 발급받은 키를 입력하세요.")
-    if not api_key:
-        api_key = os.getenv("GOOGLE_API_KEY")
+    with st.expander("🔑 API Key 설정", expanded=False):
+        api_key = st.text_input("Google API Key", type="password", help="Google AI Studio 키 입력")
         if not api_key:
-            if "GOOGLE_API_KEY" in st.secrets:
+            api_key = os.getenv("GOOGLE_API_KEY")
+            if not api_key and "GOOGLE_API_KEY" in st.secrets:
                 api_key = st.secrets["GOOGLE_API_KEY"]
-
+    
+    st.divider()
+    
+    # Clear Chat Button
+    if st.button("🗑️ 대화 내용 지우기", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
 
     st.divider()
     
-    # File Uploader (Admin Only)
-    uploaded_file = None
-    
-    # Check for admin password
-    admin_password = st.text_input("관리자 암호 (파일 업로드용)", type="password")
-    is_admin = False
-    
-    # Check env/secrets for password (default to 'admin' if not set for testing, but recommend setting it)
-    correct_password = os.getenv("ADMIN_PASSWORD") 
-    if not correct_password and "ADMIN_PASSWORD" in st.secrets:
-        correct_password = st.secrets["ADMIN_PASSWORD"]
-        
-    if correct_password and admin_password == correct_password:
-        is_admin = True
-        st.success("관리자 확인됨")
-    
-    if is_admin:
-        uploaded_file = st.file_uploader("문서 업로드 (PDF/TXT)", type=["pdf", "txt", "md"])
-    else:
-        st.info("파일 업로드는 관리자만 가능합니다. (기본 문서 사용)")
+    # File Upload Section
+    if "admin_authenticated" not in st.session_state:
+        st.session_state.admin_authenticated = False
 
+    with st.expander("📂 문서 관리 (관리자 전용)", expanded=st.session_state.admin_authenticated):
+        if not st.session_state.admin_authenticated:
+            admin_password = st.text_input("관리자 암호", type="password")
+            correct_password = os.getenv("ADMIN_PASSWORD")
+            if not correct_password and "ADMIN_PASSWORD" in st.secrets:
+                correct_password = st.secrets["ADMIN_PASSWORD"]
+            
+            if correct_password and admin_password == correct_password:
+                st.session_state.admin_authenticated = True
+                st.rerun()
+        
+        uploaded_file = None
+        if st.session_state.admin_authenticated:
+            st.success("관리자 권한 인증됨")
+            uploaded_file = st.file_uploader("문서 업로드 (PDF/TXT)", type=["pdf", "txt", "md"])
+        else:
+            st.info("문서 업로드를 위해 관리자 암호를 입력하세요.")
+
+    # Context Loading Logic
     context_text = ""
-    # 1. Try to load default file if no upload
     default_file_path = "조명에대한모든것.md"
+    
+    # 1. Load default file if available & no upload
     if not uploaded_file and os.path.exists(default_file_path):
         try:
             with open(default_file_path, "r", encoding="utf-8") as f:
                 context_text = f.read()
-            if is_admin: # Only show this info to admin to avoid clutter
-                st.info(f"기본 문서 '{default_file_path}'가 로드되었습니다. ({len(context_text)} 자)")
+            # Show loaded document info in sidebar
+            st.success(f"✅ 기본 문서 로드됨\n({os.path.basename(default_file_path)})")
         except Exception as e:
-            st.error(f"기본 문서 로드 실패: {e}")
+            st.error(f"❌ 기본 문서 로드 실패: {e}")
 
-    # 2. Overwrite with uploaded file if exists
+    # 2. Overwrite with uploaded file
     if uploaded_file:
         if uploaded_file.type == "application/pdf":
             with pdfplumber.open(uploaded_file) as pdf:
                 pages = [page.extract_text() for page in pdf.pages]
                 context_text = "\n".join(filter(None, pages))
-        else: # txt or md
+        else:
             context_text = uploaded_file.read().decode("utf-8")
-        
-        st.success(f"새로운 문서 로드 완료! ({len(context_text)} 자)")
+        st.success(f"✅ 업로드 문서 로드됨\n({uploaded_file.name})")
     
     if context_text:
-        with st.expander("로드된 텍스트 확인"):
-            st.text(context_text[:1000] + "...")
+        with st.expander("📝 로드된 텍스트 미리보기"):
+            st.text(context_text[:500] + "...")
     else:
-        st.info("문서를 업로드하면 대화를 시작할 수 있습니다.")
+        st.warning("⚠️ 로드된 문서가 없습니다.")
 
-# Chat Logic
+# Chat Logic initialization
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # Display chat history
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
+    role = message["role"]
+    avatar = "👤" if role == "user" else "💡"
+    with st.chat_message(role, avatar=avatar):
         st.markdown(message["content"])
 
 # User Input
-if prompt := st.chat_input("질문을 입력하세요..."):
+if prompt := st.chat_input("조명 팀에 대해 궁금한 점을 물어보세요..."):
     if not api_key:
-        st.error("API 키가 필요합니다.")
+        st.error("🚨 API 키가 설정되지 않았습니다.")
     elif not context_text:
-        st.error("먼저 문서를 업로드해주세요.")
+        st.error("🚨 질문에 답변할 문서(Context)가 없습니다.")
     else:
-        # User message
+        # Add user message
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
+        with st.chat_message("user", avatar="👤"):
             st.markdown(prompt)
 
-        # Assistant message
-        with st.chat_message("assistant"):
+        # Generate assistant response
+        with st.chat_message("assistant", avatar="💡"):
             message_placeholder = st.empty()
-            message_placeholder.markdown("생성 중...")
+            message_placeholder.markdown("⏳ 답변 생성 중...")
             
-            client = GeminiClient(api_key=api_key)
-            # Pass history excluding the latest prompt which is handled by send_message inside client (or handle properly)
-            # Correction: client.get_chat_response takes history excluding current prompt usually, or we pass valid history.
-            # In my client implementation, I passed the history including current prompt? No, let's check.
-            # Client code: history_for_gemini = from chat_history. chat.send_message(user_input).
-            # So we pass previous messages.
-            
-            current_history = st.session_state.messages[:-1] # Exclude the just added user prompt
-            response_text = client.get_chat_response(current_history, context_text, prompt)
-            
-            message_placeholder.markdown(response_text)
-            
-        st.session_state.messages.append({"role": "assistant", "content": response_text})
+            try:
+                client = GeminiClient(api_key=api_key)
+                # Pass history excluding current prompt
+                current_history = st.session_state.messages[:-1]
+                response_text = client.get_chat_response(current_history, context_text, prompt)
+                message_placeholder.markdown(response_text)
+                
+                # Add assistant message to history
+                st.session_state.messages.append({"role": "assistant", "content": response_text})
+                
+            except Exception as e:
+                message_placeholder.error(f"오류가 발생했습니다: {str(e)}")

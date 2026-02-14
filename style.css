@@ -1,0 +1,53 @@
+/* Custom CSS for Light RAG Chatbot */
+
+/* Hide Streamlit default menu and footer */
+#MainMenu {
+  visibility: hidden;
+}
+footer {
+  visibility: hidden;
+}
+
+/* Improve the chat input container */
+/* This specific selector may need adjustment based on Streamlit version */
+.stChatInputContainer {
+  border-radius: 20px;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Sidebar styling */
+[data-testid="stSidebar"] {
+  background-color: #f8f9fa;
+  border-right: 1px solid #e0e0e0;
+}
+
+/* Header style */
+h1 {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #333;
+  font-weight: 700;
+}
+
+/* Chat message bubbles */
+/* User message */
+[data-testid="stChatMessage"]:nth-child(odd) {
+  background-color: #eef2f5; /* Light user bubble */
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+/* Assistant message */
+[data-testid="stChatMessage"]:nth-child(even) {
+  background-color: #ffffff; /* White bot bubble */
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+/* Success/Info/Error boxes */
+.stAlert {
+  border-radius: 8px;
+}
