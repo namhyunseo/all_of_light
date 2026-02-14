@@ -10,7 +10,7 @@ load_dotenv()
 # Page configuration
 st.set_page_config(page_title="Light RAG Chatbot", layout="wide")
 
-st.title("📄 문서 기반 챗봇 (Light RAG)")
+st.title("LOGOS 조명팀 chatbot")
 
 # Sidebar for configuration
 with st.sidebar:
