@@ -28,9 +28,27 @@ with st.sidebar:
 
     st.divider()
     
-    # File Uploader
-    uploaded_file = st.file_uploader("문서 업로드 (PDF/TXT)", type=["pdf", "txt", "md"])
+    # File Uploader (Admin Only)
+    uploaded_file = None
     
+    # Check for admin password
+    admin_password = st.text_input("관리자 암호 (파일 업로드용)", type="password")
+    is_admin = False
+    
+    # Check env/secrets for password (default to 'admin' if not set for testing, but recommend setting it)
+    correct_password = os.getenv("ADMIN_PASSWORD") 
+    if not correct_password and "ADMIN_PASSWORD" in st.secrets:
+        correct_password = st.secrets["ADMIN_PASSWORD"]
+        
+    if correct_password and admin_password == correct_password:
+        is_admin = True
+        st.success("관리자 확인됨")
+    
+    if is_admin:
+        uploaded_file = st.file_uploader("문서 업로드 (PDF/TXT)", type=["pdf", "txt", "md"])
+    else:
+        st.info("파일 업로드는 관리자만 가능합니다. (기본 문서 사용)")
+
     context_text = ""
     # 1. Try to load default file if no upload
     default_file_path = "조명에대한모든것.md"
@@ -38,7 +56,8 @@ with st.sidebar:
         try:
             with open(default_file_path, "r", encoding="utf-8") as f:
                 context_text = f.read()
-            st.info(f"기본 문서 '{default_file_path}'가 로드되었습니다. ({len(context_text)} 자)")
+            if is_admin: # Only show this info to admin to avoid clutter
+                st.info(f"기본 문서 '{default_file_path}'가 로드되었습니다. ({len(context_text)} 자)")
         except Exception as e:
             st.error(f"기본 문서 로드 실패: {e}")
 
